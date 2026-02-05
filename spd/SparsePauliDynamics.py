@@ -3,6 +3,7 @@ from .utils import *
 from .PauliRepresentation import PauliRepresentation
 from .MajoranaRepresentation import MajoranaRepresentation
 from qiskit.quantum_info import SparsePauliOp
+import time
 
 class Simulation:
     """
@@ -24,6 +25,8 @@ class Simulation:
         self.observable.order_elements()
 
         self.init_operator_sequence(observable, operator_sequence)
+
+        self.original_observable_norm = np.linalg.norm(observable.coeffs)
 
         #Threshold. Default value is 0.01 to ensure that one does not accidentally run a demanding calculation.
         self.threshold = kwargs.get('threshold', 0.01)
@@ -80,18 +83,29 @@ class Simulation:
         nonzero_pauli_indices = np.where(self.observable.ztype())[0]
         return np.sum(self.observable.coeffs[nonzero_pauli_indices] * self.eval_exp_val(self.observable, nonzero_pauli_indices))
 
-    def run_dynamics(self, nsteps, process = None, process_every = 1, td_ham = None):
-        r = []
-        if process is not None:
+    def run_dynamics(self, nsteps, process = None, process_every = 1, td_ham = None, status_report=False, r=None, norm=None, start=0):
+        if r is None:
+            assert norm is None
+            r = []
+            norm = []
+        step_time = time.time()
+        if process is not None and len(r) == 0:
+            # Measure the current operator before evolution
+            # Only do if no measurements have been provided
             r.append(process(self.observable))
+            norm.append(np.linalg.norm(self.observable.coeffs)/self.original_observable_norm)
         for step in range(nsteps):
             if td_ham is not None:
                 self.init_operator_sequence(self.observable, td_ham(step))
             self.run()
             if process is not None and ((step+1) % process_every == 0):
                 r.append(process(self.observable))
+                norm.append(np.linalg.norm(self.observable.coeffs)/self.original_observable_norm)
+            if status_report and ((step+1) % process_every == 0):
+                print(f"Step {step+1 + start}: number of strings - {self.observable.size}, norm - {norm[-1]}, time - {time.time() - step_time}")
+                step_time = time.time()
         if process is not None:
-            return r
+            return r, norm
 
     def apply_gate(self, j, op):
         """
