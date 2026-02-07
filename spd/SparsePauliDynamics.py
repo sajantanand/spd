@@ -84,7 +84,7 @@ class Simulation:
         return np.sum(self.observable.coeffs[nonzero_pauli_indices] * self.eval_exp_val(self.observable, nonzero_pauli_indices))
 
     def run_dynamics(self, nsteps, process = None, process_every = 1, td_ham = None, status_report=False, r=None, norm=None, start=0):
-        if r is None:
+        if r is None and process is not None:
             assert norm is None
             r = []
             norm = []
