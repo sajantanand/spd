@@ -63,6 +63,8 @@ class Simulation:
         """
         if isinstance(observable, SparsePauliOp):
             return cls(PauliRepresentation.from_sparse_pauli_op(observable), operator_sequence, **kwargs)
+        elif isinstance(observable, PauliRepresentation):
+            return cls(observable, operator_sequence, **kwargs)
         else:
             return cls(PauliRepresentation.from_pauli_list(observable, coeffs=kwargs.get('observable_coeffs')), operator_sequence, **kwargs)
     
