@@ -33,7 +33,7 @@ class BaseOperatorRepresentation(BaseRepresentation):
         plist = PauliList([''])
         plist._z = unpackbits(self.bits[:, 0:self.nq], num_qubits)
         plist._x = unpackbits(self.bits[:, self.nq:2*self.nq], num_qubits)
-        plist._phase = np.zeros(self.size)
+        plist._phase = np.zeros(self.size, dtype=np.int64)
         return SparsePauliOp(data = PauliList(plist), coeffs = self.coeffs, ignore_pauli_phase=False)
 
     #Same as in qiskit SparsePauliOp.

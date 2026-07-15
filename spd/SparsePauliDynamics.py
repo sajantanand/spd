@@ -40,6 +40,11 @@ class Simulation:
         if self.eval_exp_val is None:
             self.eval_exp_val = lambda _a, _b: 1
 
+        self.keep_discarded = kwargs.get('keep_discarded', False)
+        self.discarded_threshold = kwargs.get('discarded_threshold', 0)
+        if self.keep_discarded:
+            self.discarded = PauliRepresentation.from_sparse_pauli_op(SparsePauliOp.from_sparse_list([("", [], 0)], num_qubits=self.observable.nq*64))
+
     def init_operator_sequence(self, observable, operator_sequence):
         """
         Prepares coefficients for the rotation operators.
@@ -106,6 +111,8 @@ class Simulation:
             if status_report and ((step+1) % process_every == 0):
                 print(f"Step {step+1 + start}: number of strings - {self.observable.size}, norm - {norm[-1]}, time - {time.time() - step_time}")
                 step_time = time.time()
+            if hasattr(self, 'callback'):
+                self.callback(self)
         if process is not None:
             return r, norm
 
@@ -133,6 +140,8 @@ class Simulation:
             to_add_remove = np.empty(len(anticommuting), dtype=np.bool_)
             a_lt_b(self.observable.coeffs[anticommuting], self.threshold, to_add_remove)
             if np.any(to_add_remove):
+                if self.keep_discarded:
+                    self.discarded.insert_elements(new_paulis[to_add_remove], order=True, serial=(self.nprocs==1))
                 self.observable.delete_elements(anticommuting[to_add_remove], serial=(self.nprocs==1))
 
             #Find which Paulis will be added to the observable.
@@ -140,6 +149,14 @@ class Simulation:
             if np.any(to_add_remove):
                 #Before inserting, new paulis must be sorted so that they can be correctly inserted simultaneously.
                 self.observable.insert_elements(new_paulis[to_add_remove], order=True, serial=(self.nprocs==1))
+
+            if self.keep_discarded:
+                a_lt_b(new_paulis.coeffs, self.threshold, to_add_remove)
+                to_add_remove = np.logical_and(to_add_remove, np.logical_not(new_pauli_in_observable))
+                if np.any(to_add_remove):
+                    self.discarded.insert_elements(new_paulis[to_add_remove], order=True, serial=(self.nprocs==1))
+                a_lt_b(self.discarded.coeffs, self.discarded_threshold, to_add_remove)
+                self.discarded.remove_duplicates(order=True, threshold=self.discarded_threshold, serial=(self.nprocs==1))
     
     def prepare_new_paulis(self, obs, anticommuting_ind, op):
         """
